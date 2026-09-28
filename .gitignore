@@ -1,0 +1,25 @@
+# Fichiers objets
+*.o
+*.obj
+
+# Bibliothèques compilées
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+
+# Fichiers d'en-tête précompilés
+*.gch
+*.pch
+
+# Exécutables (décommente la ligne suivante selon tes besoins)
+# *.exe
+
+# Dossiers de build courants
+build/
+bin/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
