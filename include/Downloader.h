@@ -3,6 +3,6 @@
 
 #include <stdbool.h>
 
-bool Downloader(const char *destination, const char *url);
+bool cloud_download(const char *destination, const char *url);
 
 #endif

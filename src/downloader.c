@@ -1,19 +1,10 @@
-#include "Downloader.h"
+#include "downloader.h"
 
 #include <stdio.h>
 #include <curl/curl.h>
 
-/* libcurl appelle cette fonction chaque fois qu'un paquet d'octets arrive.
-   Elle est "static" : visible seulement dans ce fichier.
-   Elle est ici, AU NIVEAU DU FICHIER, pas dans une autre fonction. */
-static size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata)
-{
-  /* TROU 2 : ecrire les octets dans le fichier */
-  return 0;
-}
 
-
-bool Downloader(const char *destination, const char *url)
+bool cloud_download(const char *destination, const char *url)
 {
   FILE *f = NULL;
   CURL *curl = NULL;
