@@ -41,5 +41,6 @@ bool cloud_download(const char *destination, const char *url)
   cleanup:
     if (curl != NULL) curl_easy_cleanup(curl);
     if (f != NULL) fclose(f);
+    if (!ok) remove(destination);
     return ok;
 }
