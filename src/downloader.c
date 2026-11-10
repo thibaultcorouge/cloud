@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <curl/curl.h>
 
-
 bool cloud_download(const char *destination, const char *url)
 {
   FILE *f = NULL;
@@ -11,7 +10,7 @@ bool cloud_download(const char *destination, const char *url)
   bool ok = false;
 
   f = fopen(destination, "wb");
-  if ( f == NULL) {
+  if (f == NULL) {
     fprintf(stderr, "Erreur d'ouverture \n");
     goto cleanup;
   }
@@ -26,7 +25,7 @@ bool cloud_download(const char *destination, const char *url)
   curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
   CURLcode res = curl_easy_perform(curl);
   if (res != CURLE_OK) {
-    fprintf(stderr , "Echec du téléchargement : %s\n", curl_easy_strerror(res));
+    fprintf(stderr, "Echec du téléchargement : %s\n", curl_easy_strerror(res));
     goto cleanup;
   }
   long code = 0;
@@ -38,9 +37,12 @@ bool cloud_download(const char *destination, const char *url)
 
   ok = true;
 
-  cleanup:
-    if (curl != NULL) curl_easy_cleanup(curl);
-    if (f != NULL) fclose(f);
-    if (!ok) remove(destination);
-    return ok;
+cleanup:
+  if (curl != NULL)
+    curl_easy_cleanup(curl);
+  if (f != NULL)
+    fclose(f);
+  if (!ok)
+    remove(destination);
+  return ok;
 }

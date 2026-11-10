@@ -1,0 +1,15 @@
+# Style C pour le projet Cloud
+BasedOnStyle: LLVM
+IndentWidth: 2
+ColumnLimit: 100
+
+# Accolade a la ligne pour les FONCTIONS, collee pour if/for/while
+# (style C traditionnel, dit "Linux")
+BreakBeforeBraces: Linux
+
+# Ne pas reordonner les #include : le regroupement est volontaire
+SortIncludes: false
+
+# Aligner les commentaires de fin de ligne
+AlignTrailingComments: true
+AlignConsecutiveAssignments: false

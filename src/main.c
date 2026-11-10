@@ -4,14 +4,14 @@
 #include <curl/curl.h>
 #include "grib.h"
 
-int main(void) {
+int main(void)
+{
 
   curl_global_init(CURL_GLOBAL_DEFAULT);
 
   const char *destination = "model.grib2";
-  const char *url = "https://www.data.gouv.fr/api/1/datasets/r/f42f396c-cc81-4c65-a977-354ac91cd032";
-
-
+  const char *url =
+      "https://www.data.gouv.fr/api/1/datasets/r/f42f396c-cc81-4c65-a977-354ac91cd032";
 
   printf("Ecriture dans %s ... \n", destination);
 
@@ -29,10 +29,10 @@ int main(void) {
   curl_global_cleanup();
   return EXIT_SUCCESS;
 
-
   // curl_global_init(CURL_GLOBAL_DEFAULT);
-  // std::string url = "https://www.data.gouv.fr/api/1/datasets/r/f42f396c-cc81-4c65-a977-354ac91cd032";
-  // std::string destination = "model.grib2";
+  // std::string url =
+  // "https://www.data.gouv.fr/api/1/datasets/r/f42f396c-cc81-4c65-a977-354ac91cd032"; std::string
+  // destination = "model.grib2";
 
   // Downloader downloader;
 
@@ -41,6 +41,4 @@ int main(void) {
   // } else {
   //   std::cerr << "Echec !" << std::endl;
   // }
-
-
 }
