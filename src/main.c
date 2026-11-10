@@ -21,7 +21,9 @@ int main(void) {
     return EXIT_FAILURE;
   }
 
-  if (!)
+  if (grib_inspect(destination)) {
+    printf("GRIB here!\n");
+  }
 
   printf("Succes ! \n");
   curl_global_cleanup();

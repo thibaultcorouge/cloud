@@ -728,13 +728,36 @@ Chaque section (sauf 0 et 8) commence par : **longueur sur 4 octets**, puis **nu
 | 31 | mois |
 | 32 | jour |
 
-### ⚠️ Big-endian
+### ⚠️ Big-endian — la recette
 
-Le GRIB stocke **l'octet de poids fort d'abord**. Un x86/arm64 est **little-endian**. Il faut donc recomposer les entiers à la main, avec des décalages (`<<`) et des `|`.
+Le GRIB stocke **l'octet de poids fort d'abord**. Un x86/arm64 est **little-endian**. On ne peut donc **pas** `fread` directement dans un `uint64_t` : il faut recomposer octet par octet.
+
+```c
+uint64_t total = 0;
+for (int i = 8; i < 16; i++) {
+    total = (total << 8) | header[i];
+}
+```
+
+**L'analogie :** c'est exactement comme lire `347` chiffre par chiffre en base 10 —
+`total = total*10 + chiffre`. Ici on est en **base 256**, donc « ×256 » s'écrit `<< 8`,
+et « + » s'écrit `|` (les 8 bits de droite viennent d'être libérés, ils sont à zéro).
+
+Trace réelle sur `00 00 00 00 00 3b d3 35` :
 
 ```
-0x07 0xea  →  0x07 * 256 + 0xea  =  2026
+  i= 8..12  + 0x00  ->             0
+  i=13      + 0x3b  ->            59
+  i=14      + 0xd3  ->        15 315
+  i=15      + 0x35  ->     3 920 693
 ```
+
+⚠️ **Trois pièges :**
+- **l'ordre** : parcourir du poids fort vers le poids faible (indice croissant ici)
+- **le type de l'accumulateur** : `uint64_t` pour 8 octets, et **non signé** (décaler du signé est de l'UB)
+- **le type du tampon** : `uint8_t`, jamais `char` (un octet ≥ 0x80 deviendrait négatif et ruinerait le `|`)
+
+Affichage d'un `uint64_t` : `%llu` (ou la forme portable `printf("%" PRIu64, x)` avec `<inttypes.h>`).
 
 ### Niveaux (code table 4.5)
 
@@ -830,6 +853,14 @@ Les nuages vivent entre ~500 m et ~12 000 m → il faut un paquet **`IP`**.
 | 18 | `goto cleanup;` juste avant `ok = true;` | **Une étiquette ne bloque pas l'exécution.** On tombe dedans. Aucun `goto` sur le chemin du succès. |
 | 19 | Mauvais jeu de données (`HP` au lieu de `IP`) | Vérifier le **contenu** des données, pas seulement que le téléchargement marche. |
 
+| 20 | `memcmp(header, 0, 6)` pour comparer **un** octet à une valeur | `memcmp` compare des **suites d'octets** (2 adresses + une longueur). Pour un seul octet, qui est un **nombre**, on utilise `==`. Et le 3ᵉ argument est une **longueur**, pas une position. |
+| 21 | `"0"` au lieu de `0` | `'0'` = le caractère (48 en ASCII), `"0"` = une chaîne de 2 octets, `0` = le nombre. En binaire on veut presque toujours le nombre. |
+| 22 | `for (i = 8; i < 15; i++)` pour lire `header[8]`..`header[15]` | **Off-by-one.** `for (i = a; i < b; i++)` tourne exactement `b - a` fois. Pour 8 octets à partir de l'indice 8 : `b = 16`. Convention de l'intervalle semi-ouvert `[a, b)`. |
+| 23 | `PRIu64` sans `#include <inttypes.h>` | Compilait par chance (macOS le tire indirectement). Casserait ailleurs. |
+| 24 | `int fseek(f, offset, SEEK_SET);` | Le **type devant** transforme l'appel en **déclaration**. Repère : un type doit être suivi d'un **nom de variable** et d'un `=`. S'il est suivi du nom de la fonction, tu déclares. Et on ne déclare **jamais** une fonction de la libc : `#include` l'a fait. |
+| 25 | `total = offset;` au lieu de `offset += total;` | Inversion. Les deux variables ont le même type → invisible pour le compilateur. Conséquence : `offset` ne bouge jamais → **boucle infinie**. |
+| 26 | `goto cleanup` sur la fin de fichier dans une boucle | La **même** condition technique (lecture courte) est une erreur ou un succès **selon le contexte**. En fin de boucle, c'est un `break`. |
+
 ### Méta-leçons
 
 1. **Lire la première erreur, pas la liste.** Corriger, recompiler, recommencer.
@@ -902,22 +933,29 @@ target_compile_options(cloud PRIVATE -Wall -Wextra -Wunreachable-code)
 - Décodage manuel de l'en-tête GRIB2 (magic, discipline, édition, longueur, centre, date)
 - Constat : 20 messages dans le fichier, mais **mauvais paquet** (`HP` : 10/20/50/100 m)
 
+- **`grib_inspect(path)`** dans `src/grib.c` — **section 0 entièrement décodée** :
+  - `fopen("rb")` + test `NULL`, `goto cleanup`
+  - `uint8_t header[16]` + `fread`, retour comparé à 16
+  - `memcmp(header, "GRIB", 4)` → nombre magique validé
+  - `header[6]` → discipline (0 = météo), `header[7]` → édition (2)
+  - `header[8..15]` → **longueur du message en big-endian** = 3 920 693 octets ✅
+  - l'affichage est fait par l'appelant (`main`), pas par la fonction → bonne séparation
+
+- **Marcheur de messages** ✅ : boucle `fseek(f, offset, SEEK_SET)` + accumulateur `offset += longueur`.
+  - **20 messages trouvés**, et la **somme des longueurs = taille du fichier à l'octet près** (72 091 291) → le parser est validé par le fichier lui-même.
+  - Sortie de boucle par `break` quand `fread` rend moins que 16 (fin de fichier = succès, pas erreur).
+  - ⚠️ Ne **jamais** utiliser `feof()` comme condition de boucle : il ne devient vrai qu'*après* une lecture échouée → un tour de trop.
+
 ### 🚧 En cours
 
-- **`grib_inspect(path)`** dans `src/grib.c` — trois trous à remplir :
-  1. ouvrir en `"rb"` + tester
-  2. tampon `uint8_t header[16]` + `fread`
-  3. `memcmp(header, "GRIB", 4)`
 - Trouver l'URL du bon paquet (**`IP`** / niveaux isobares)
 
 ### ⏭️ Ensuite
 
-1. Lire discipline (octet 7) et édition (octet 8)
-2. **Lire la longueur du message : 8 octets big-endian** → décalages de bits, le vrai morceau
-3. Boucler sur les messages (`fseek`) → doit trouver 20
-4. Descendre dans les sections 1..7 (longueur + numéro de section)
-5. Filtrer sur l'humidité (catégorie 1), extraire les valeurs
-6. Puis : grille 3D, interpolation/krigeage, Marching Cubes, OpenGL
+1. Descendre dans les sections 1..7 (chacune : longueur sur 4 octets + numéro de section sur 1 octet)
+3. Section 4 → filtrer sur l'humidité (catégorie 1), lire le type et la valeur du niveau
+4. Section 7 → extraire les valeurs empaquetées (décalages de bits, masques)
+5. Puis : grille 3D, interpolation/krigeage, Marching Cubes, OpenGL
 
 ### 🔧 Petites dettes
 
